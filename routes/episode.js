@@ -18,9 +18,20 @@ function cacheSet(key, value, ttlMs) {
     cache.set(key, { value, expiry: Date.now() + ttlMs });
 }
 
+function extractAnimeNumericId(raw) {
+    const value = decodeURIComponent(String(raw || '')).trim();
+    if (!value) return null;
+    const direct = value.match(/^(\d+)$/);
+    if (direct) return direct[1];
+    // Use trailing numeric token from anime slug, e.g. "title-part-1-20401" -> 20401
+    const tail = value.match(/-(\d+)$/);
+    if (tail) return tail[1];
+    return null;
+}
+
 episode.get('/episode/:id', async (req, res) => {
-    const episodeanime = decodeURIComponent(String(req.params.id || '')).trim();
-    if (!episodeanime || !/^[a-z0-9-]+$/i.test(episodeanime)) {
+    const episodeanime = extractAnimeNumericId(req.params.id);
+    if (!episodeanime) {
         return res.status(400).json({ error: 'Invalid anime id' });
     }
 
