@@ -18,7 +18,8 @@ function cacheSet(key, value, ttlMs) {
 }
 
 mix.get('/mix/:id/:page?', async (req, res) => {
-    const mixid = req.params.id;
+    const mixidRaw = String(req.params.id || '').toLowerCase().trim();
+    const mixid = mixidRaw === 'popular' ? 'most-popular' : mixidRaw;
     const pagenumber = parseInt(req.params.page) || 1;
 
     const cacheKey = `mix_${mixid}_${pagenumber}`;
@@ -61,8 +62,8 @@ mix.get('/mix/:id/:page?', async (req, res) => {
         cacheSet(cacheKey, result, 5 * 60 * 1000);
         res.json(result);
     } catch (error) {
-        console.error('[mix] Error:', error.message);
-        res.status(500).json({ error: 'Internal Server Error' });
+        console.error('[mix] Error:', mixidRaw, '->', mixid, error.message);
+        res.status(500).json({ error: 'Internal Server Error', type: mixidRaw, upstreamType: mixid });
     }
 });
 
