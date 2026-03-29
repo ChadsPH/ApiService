@@ -18,15 +18,25 @@ function cacheSet(key, value, ttlMs) {
     cache.set(key, { value, expiry: Date.now() + ttlMs });
 }
 
-server.get('/server/:id', async (req, res) => {
-    const serverour = req.params.id.match(/\d+/);
-    if (!serverour) return res.status(400).json({ error: 'Invalid episode id' });
+function extractEpisodeId(raw) {
+    const value = decodeURIComponent(String(raw || '')).trim();
+    if (!value) return null;
+    const epParam = value.match(/^ep=(\d+)$/i);
+    if (epParam) return epParam[1];
+    const numeric = value.match(/^(\d+)$/);
+    if (numeric) return numeric[1];
+    return null;
+}
 
-    const cacheKey = `server_${serverour[0]}`;
+server.get('/server/:id', async (req, res) => {
+    const episodeId = extractEpisodeId(req.params.id);
+    if (!episodeId) return res.status(400).json({ error: 'Invalid episode id' });
+
+    const cacheKey = `server_${episodeId}`;
     const cached = cacheGet(cacheKey);
     if (cached) return res.json({ ...cached, cached: true });
 
-    const serverlink = `https://aniwatchtv.to/ajax/v2/episode/servers?episodeId=${serverour}`;
+    const serverlink = `https://aniwatchtv.to/ajax/v2/episode/servers?episodeId=${episodeId}`;
 
     try {
         const serverdefine = await axios.get(serverlink, {

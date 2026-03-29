@@ -19,10 +19,12 @@ function cacheSet(key, value, ttlMs) {
 }
 
 episode.get('/episode/:id', async (req, res) => {
-    const episodeanime = req.params.id.match(/\d+/);
-    if (!episodeanime) return res.status(400).json({ error: 'Invalid anime id' });
+    const episodeanime = decodeURIComponent(String(req.params.id || '')).trim();
+    if (!episodeanime || !/^[a-z0-9-]+$/i.test(episodeanime)) {
+        return res.status(400).json({ error: 'Invalid anime id' });
+    }
 
-    const cacheKey = `episode_${episodeanime[0]}`;
+    const cacheKey = `episode_${episodeanime}`;
     const cached = cacheGet(cacheKey);
     if (cached) return res.json({ episodetown: cached, cached: true });
 
