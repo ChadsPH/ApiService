@@ -1,7 +1,9 @@
 # ApiService — Anime API
-An Express.js API for fetching anime data from Aniwatch.to (formerly Zoro.to).
 
-**Base URL:** `https://apiservice-a0mh.onrender.com`
+An Express.js API for fetching anime data from AniWatch (aniwatchtv.to).  
+Video sources are served via **megaplay.buzz** — a reliable long-term video host that mirrors the AniWatch library.
+
+**Base URL:** `https://apiservice-production-585e.up.railway.app`
 
 ---
 
@@ -15,7 +17,7 @@ An Express.js API for fetching anime data from Aniwatch.to (formerly Zoro.to).
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-a0mh.onrender.com/api/parse");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/parse");
 const data = await resp.json();
 ```
 
@@ -65,14 +67,14 @@ const data = await resp.json();
 /api/search/:query/:page
 ```
 
-| Parameter | Type   | Description          | Required |
-|-----------|--------|----------------------|----------|
-| `query`   | string | Anime title to search | Yes      |
+| Parameter | Type   | Description           | Required         |
+|-----------|--------|-----------------------|------------------|
+| `query`   | string | Anime title to search | Yes              |
 | `page`    | int    | Page number           | Yes (default: 1) |
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-a0mh.onrender.com/api/search/your%20name/1");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/search/your%20name/1");
 const data = await resp.json();
 ```
 
@@ -105,14 +107,14 @@ const data = await resp.json();
 /api/genre/:genre_name/:page
 ```
 
-| Parameter    | Type   | Description     | Required |
-|--------------|--------|-----------------|----------|
-| `genre_name` | string | Genre name (e.g. `romance`, `action`) | Yes |
-| `page`       | int    | Page number     | Yes (default: 1) |
+| Parameter    | Type   | Description                          | Required         |
+|--------------|--------|--------------------------------------|------------------|
+| `genre_name` | string | Genre name (e.g. `romance`, `action`) | Yes              |
+| `page`       | int    | Page number                          | Yes (default: 1) |
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-a0mh.onrender.com/api/genre/romance/1");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/genre/romance/1");
 const data = await resp.json();
 ```
 
@@ -146,13 +148,13 @@ const data = await resp.json();
 /api/shedule/:date
 ```
 
-| Parameter | Type   | Description              | Required |
-|-----------|--------|--------------------------|----------|
-| `date`    | string | Date in `yyyy-mm-dd` format | Yes   |
+| Parameter | Type   | Description               | Required |
+|-----------|--------|---------------------------|----------|
+| `date`    | string | Date in `yyyy-mm-dd` format | Yes     |
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-a0mh.onrender.com/api/shedule/2024-01-28");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/shedule/2024-01-28");
 const data = await resp.json();
 ```
 
@@ -184,7 +186,7 @@ const data = await resp.json();
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-a0mh.onrender.com/api/related/hunter-x-hunter-128");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/related/hunter-x-hunter-128");
 const data = await resp.json();
 ```
 
@@ -207,7 +209,7 @@ const data = await resp.json();
       "image": "https://img.flawlessfiles.com/..."
     },
     {
-      "japanese": "HUNTER×HUNTER（ハンター×ハンター）",
+      "japanese": "HUNTER×HUNTER",
       "aired": "Oct 16, 1999 to Mar 31, 2001",
       "premired": "Fall 1999",
       "statusAnime": "Finished Airing",
@@ -215,18 +217,6 @@ const data = await resp.json();
       "genre": ["Action", "Adventure", "Fantasy", "Shounen"],
       "studio": "Nippon Animation",
       "producer": ["Fuji TV", "Nippon Animation", "Viz Media"]
-    },
-    {
-      "animechar": [
-        {
-          "name": "Freecss, Gon",
-          "voice": "Takeuchi, Junko",
-          "animeImg": "https://img.flawlessfiles.com/...",
-          "animedesignation": "Main",
-          "voicelang": "Japanese",
-          "voiceImageX": "https://img.flawlessfiles.com/..."
-        }
-      ]
     }
   ],
   "mal_id": "136"
@@ -248,7 +238,7 @@ const data = await resp.json();
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-a0mh.onrender.com/api/mix/tv/1");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/mix/tv/1");
 const data = await resp.json();
 ```
 
@@ -287,7 +277,7 @@ const data = await resp.json();
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-a0mh.onrender.com/api/episode/hunter-x-hunter-128");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/episode/hunter-x-hunter-128");
 const data = await resp.json();
 ```
 
@@ -304,6 +294,8 @@ const data = await resp.json();
 }
 ```
 
+> 💡 The number after `ep=` is the **episode ID** used by `/api/server` and `/api/mega-embed`.
+
 ---
 
 ### `GET` Episode Servers
@@ -312,13 +304,13 @@ const data = await resp.json();
 /api/server/:epId
 ```
 
-| Parameter | Type   | Description                         | Required |
-|-----------|--------|-------------------------------------|----------|
-| `epId`    | string | Episode ID from the episode list (e.g. `ep=3662`) | Yes |
+| Parameter | Type   | Description                              | Required |
+|-----------|--------|------------------------------------------|----------|
+| `epId`    | string | Episode ID (e.g. `ep=3662` or just `3662`) | Yes    |
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-a0mh.onrender.com/api/server/ep=3662");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/server/ep=3662");
 const data = await resp.json();
 ```
 
@@ -327,68 +319,138 @@ const data = await resp.json();
 {
   "sub": [
     { "server": "vidstreaming", "id": "4", "srcId": "636137" },
-    { "server": "megacloud",    "id": "1", "srcId": "411986" },
-    { "server": "streamsb",     "id": "5", "srcId": "830715" },
-    { "server": "streamtape",   "id": "3", "srcId": "830716" }
+    { "server": "megacloud",    "id": "1", "srcId": "411986" }
   ],
   "dub": [
     { "server": "vidstreaming", "id": "4", "srcId": "582275" },
-    { "server": "megacloud",    "id": "1", "srcId": "2720"   },
-    { "server": "streamsb",     "id": "5", "srcId": "714095" },
-    { "server": "streamtape",   "id": "3", "srcId": "736795" }
+    { "server": "megacloud",    "id": "1", "srcId": "2720"   }
   ]
 }
 ```
 
 ---
 
-### `GET` Video Source (Stream URL)
+### `GET` Video Source (MegaCloud)
 
 ```
 /api/src-server/:srcId
 ```
 
-Use `srcId` from the server list above. Only **megacloud** (`id: "1"`) is supported.
+Use the `srcId` from `/api/server`. The extractor auto-detects the server type and routes accordingly. MegaCloud decryption keys are fetched from an externally-maintained repo so they stay up-to-date automatically.
 
-| Parameter | Type | Description                    | Required |
-|-----------|------|--------------------------------|----------|
-| `srcId`   | int  | `srcId` from `/api/server` response | Yes |
+| Parameter | Type | Description                         | Required |
+|-----------|------|-------------------------------------|----------|
+| `srcId`   | int  | `srcId` from `/api/server` response | Yes      |
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-a0mh.onrender.com/api/src-server/2720");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/src-server/2720");
+const data = await resp.json();
+```
+
+**Response (HLS sources):**
+```json
+{
+  "restres": {
+    "sources": [
+      { "url": "https://eno.tendoloads.com/...master.m3u8", "type": "hls" }
+    ],
+    "tracks": [],
+    "intro": { "start": 0, "end": 0 },
+    "outro": { "start": 0, "end": 0 },
+    "referer": "https://megacloud.blog/"
+  }
+}
+```
+
+**Response (embed-only servers):**
+```json
+{
+  "restres": {
+    "sources": [],
+    "tracks": [],
+    "embedUrl": "https://megaplay.buzz/stream/s-2/136197/sub"
+  }
+}
+```
+
+> ℹ️ When `sources` is empty and `embedUrl` is present, use the `/api/mega-embed` endpoint or load the URL in an iframe.
+
+---
+
+### `GET` MegaPlay Embed URL ⭐ New
+
+```
+/api/mega-embed/:episodeId/:lang
+```
+
+The simplest way to get a working video player for any episode.  
+Uses **megaplay.buzz** — mirrors the full AniWatch library and works even if the original source changes.
+
+| Parameter   | Type   | Description                                   | Required |
+|-------------|--------|-----------------------------------------------|----------|
+| `episodeId` | int    | The `ep=` number from the AniWatch episode URL | Yes      |
+| `lang`      | string | `sub` or `dub`                                | Yes      |
+
+**How to find the episodeId:**  
+From `/api/episode/:animeId`, each episode has an `epId` like `"hunter-x-hunter-128?ep=3661"`.  
+The episodeId is the number after `ep=` → `3661`.
+
+**Request:**
+```javascript
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/mega-embed/3661/sub");
 const data = await resp.json();
 ```
 
 **Response:**
 ```json
 {
-  "restres": {
-    "sources": [
-      {
-        "url": "https://eno.tendoloads.com/...master.m3u8",
-        "type": "hls"
-      }
-    ],
-    "tracks": [],
-    "intro": { "start": 0, "end": 0 },
-    "outro": { "start": 0, "end": 0 }
-  }
+  "embedUrl": "https://megaplay.buzz/stream/s-2/3661/sub",
+  "iframe": "<iframe src=\"https://megaplay.buzz/stream/s-2/3661/sub\" width=\"100%\" height=\"100%\" frameborder=\"0\" scrolling=\"no\" allowfullscreen></iframe>"
 }
 ```
 
-> ℹ️ Responses are cached for 5 minutes. A `"cached": true` field will appear on cached responses.
+You can paste the `iframe` value directly into your HTML, or use `embedUrl` in a custom iframe component.
 
 ---
 
-## Typical Playback Flow
+## Typical Playback Flows
+
+### Flow A — MegaPlay (recommended, simplest)
 
 ```
-1. GET /api/episode/:animeId       → get episode list + epId
-2. GET /api/server/:epId           → get server list + srcId (use megacloud srcId)
-3. GET /api/src-server/:srcId      → get HLS stream URL
-4. Feed the .m3u8 URL into your video player
+1. GET /api/episode/:animeId         → get episode list, extract episodeId from ep=XXXXX
+2. GET /api/mega-embed/:episodeId/sub  → get ready-to-use megaplay.buzz embed URL
+3. Render the iframe on your page
 ```
+
+### Flow B — Direct HLS (advanced)
+
+```
+1. GET /api/episode/:animeId         → get episode list + epId
+2. GET /api/server/:epId             → get server list + srcId (use megacloud srcId)
+3. GET /api/src-server/:srcId        → get HLS stream URL
+4. Feed the .m3u8 URL into your video player (hls.js, Video.js, etc.)
+```
+
+---
+
+## Caching
+
+All endpoints cache responses in memory to reduce upstream load:
+
+| Endpoint         | Cache TTL  |
+|------------------|------------|
+| `/api/parse`     | 5 minutes  |
+| `/api/search`    | —          |
+| `/api/genre`     | 5 minutes  |
+| `/api/episode`   | 10 minutes |
+| `/api/server`    | 3 minutes  |
+| `/api/src-server`| 5 minutes  |
+| `/api/related`   | 10 minutes |
+| `/api/mix`       | 5 minutes  |
+
+Cached responses include a `"cached": true` field.
 
 ---
 
@@ -397,5 +459,6 @@ const data = await resp.json();
 - **Runtime:** Node.js
 - **Framework:** Express.js
 - **Scraping:** Axios + Cheerio
-- **Decryption:** Node.js `crypto` (AES-256-CBC)
-- **Hosting:** Render
+- **Decryption:** Node.js `crypto` (AES-256-CBC) + [MegacloudKeys](https://github.com/yogesh-hacker/MegacloudKeys) (auto-updating keys)
+- **Video Host:** [megaplay.buzz](https://megaplay.buzz/api)
+- **Hosting:** Railway
