@@ -11,6 +11,7 @@ const shedule = require('./routes/shedule.js');
 const server = require('./routes/server.js');
 const src       = require('./routes/src1.js');
 const character = require('./routes/character.js');
+const azlist    = require('./routes/azlist.js');
 
 const inde = express();
 const port = process.env.PORT || 3005;
@@ -43,6 +44,7 @@ inde.use('/api', shedule);
 inde.use('/api', server);
 inde.use('/api', src);
 inde.use('/api', character);
+inde.use('/api', azlist);
 
 inde.get('/', (req, res) => {
     res.send('Api Is ON SERVICE !');
