@@ -9,7 +9,8 @@ const mix = require('./routes/mix.js');
 const episode = require('./routes/episode.js');
 const shedule = require('./routes/shedule.js');
 const server = require('./routes/server.js');
-const src = require('./routes/src1.js');
+const src       = require('./routes/src1.js');
+const character = require('./routes/character.js');
 
 const inde = express();
 const port = process.env.PORT || 3005;
@@ -41,12 +42,12 @@ inde.use('/api', episode);
 inde.use('/api', shedule);
 inde.use('/api', server);
 inde.use('/api', src);
+inde.use('/api', character);
 
 inde.get('/', (req, res) => {
     res.send('Api Is ON SERVICE !');
 });
 
-// ✅ Global error handler
 inde.use((err, req, res, next) => {
     console.error(err);
     res.status(500).json({ error: 'Internal Server Error' });
