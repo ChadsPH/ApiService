@@ -18,12 +18,44 @@ function cacheSet(key, value, ttlMs) {
     cache.set(key, { value, expiry: Date.now() + ttlMs });
 }
 
-// Valid letter tokens AniWatch accepts
+// ── Valid letter tokens (path segments used by AniWatch) ──────────────────────
+//   #     → /az-list/other
+//   0-9   → /az-list/0-9
+//   A-Z   → /az-list/A … /az-list/Z
 const VALID_LETTERS = new Set([
     'A','B','C','D','E','F','G','H','I','J','K','L','M',
     'N','O','P','Q','R','S','T','U','V','W','X','Y','Z',
-    '0',  // AniWatch uses "0" for numbers/symbols
+    '0-9', 'OTHER',
 ]);
+
+/**
+ * Normalise the raw letter value from the request.
+ * Returns: canonical path segment string | null (= All) | undefined (= invalid)
+ */
+function normaliseLetter(raw) {
+    if (!raw) return null;
+    const u = raw.toUpperCase().trim();
+    if (u === '' || u === 'ALL') return null;
+    if (u === '#' || u === 'OTHER') return 'other';   // → /az-list/other
+    if (u === '0' || u === '0-9')  return '0-9';      // → /az-list/0-9
+    if (VALID_LETTERS.has(u))      return u;           // A-Z
+    return undefined; // invalid
+}
+
+/**
+ * Build the AniWatch az-list URL using the correct PATH-based format.
+ *
+ *   All     → https://aniwatchtv.to/az-list?page=1
+ *   Letter  → https://aniwatchtv.to/az-list/A?page=2
+ *   Numbers → https://aniwatchtv.to/az-list/0-9?page=1
+ *   Symbols → https://aniwatchtv.to/az-list/other?page=1
+ */
+function buildUrl(letter, page) {
+    const base = letter
+        ? `https://aniwatchtv.to/az-list/${letter}`
+        : 'https://aniwatchtv.to/az-list';
+    return `${base}?page=${page}`;
+}
 
 /**
  * Parse .flw-item cards from a loaded cheerio instance.
@@ -33,55 +65,40 @@ function parseItems($) {
     $('.flw-item').each((_, el) => {
         const href = $(el).find('.film-poster a').attr('href') || '';
         items.push({
-            name:     $(el).find('.dynamic-name').text().trim()   || null,
-            jname:    $(el).find('.dynamic-name').attr('data-jname') || null,
-            id:       href.split('/')[1]?.split('?')[0]           || null,
+            name:     $(el).find('.dynamic-name').text().trim()       || null,
+            jname:    $(el).find('.dynamic-name').attr('data-jname')  || null,
+            id:       href.split('/')[1]?.split('?')[0]               || null,
             image:    $(el).find('.film-poster img').attr('data-src') || null,
-            format:   $(el).find('.fdi-item:first').text().trim() || null,
-            duration: $(el).find('.fdi-item:eq(1)').text().trim() || null,
-            sub:      $(el).find('.tick-sub').text().trim()        || null,
-            dub:      $(el).find('.tick-dub').text().trim()        || null,
-            totalEp:  $(el).find('.tick-eps').text().trim()        || null,
+            format:   $(el).find('.fdi-item:first').text().trim()     || null,
+            duration: $(el).find('.fdi-item:eq(1)').text().trim()     || null,
+            rating:   $(el).find('.tick-rate').text().trim()          || null,
+            sub:      $(el).find('.tick-sub').text().trim()           || null,
+            dub:      $(el).find('.tick-dub').text().trim()           || null,
+            totalEp:  $(el).find('.tick-eps').text().trim()           || null,
         });
     });
     return items;
 }
 
-/**
- * Build the AniWatch az-list URL.
- * letter=null → no letter filter (returns everything, sorted A-Z)
- */
-function buildUrl(letter, page) {
-    const base = 'https://aniwatchtv.to/az-list';
-    const params = new URLSearchParams();
-    if (letter) params.set('letter', letter.toUpperCase());
-    params.set('page', String(page));
-    return `${base}?${params.toString()}`;
-}
-
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/az-list
-//   Optional query params: ?letter=A  ?page=2
+// GET /api/az-list                   → all letters, page 1
+// GET /api/az-list?letter=A&page=2   → query-string style
+// GET /api/az-list/:letter           → /api/az-list/A
+// GET /api/az-list/:letter/:page     → /api/az-list/A/2
 //
-// GET /api/az-list/:letter
-// GET /api/az-list/:letter/:page
-//
-// letter  — single A-Z letter, or "0" for numbers/symbols (case-insensitive)
+// letter  — A-Z | 0-9 | other | # (case-insensitive); omit for All
 // page    — page number (default 1)
 //
-// Returns:
-//   { letter, page, totalPages, hasNextPage, items: [...] }
+// Response: { letter, page, totalPages, hasNextPage, availableLetters?, items }
 // ─────────────────────────────────────────────────────────────────────────────
 async function handleAzList(req, res) {
-    // Support both path params and query params
-    const rawLetter = (req.params.letter || req.query.letter || '').toUpperCase().trim();
-    const letter    = rawLetter === '' ? null : rawLetter;
+    const rawLetter = req.params.letter || req.query.letter || '';
+    const letter    = normaliseLetter(rawLetter);
     const page      = Math.max(1, parseInt(req.params.page || req.query.page) || 1);
 
-    // Validate letter
-    if (letter !== null && !VALID_LETTERS.has(letter)) {
+    if (letter === undefined) {
         return res.status(400).json({
-            error: `Invalid letter "${letter}". Use A-Z or "0" for numbers/symbols.`,
+            error: `Invalid letter "${rawLetter}". Use A-Z, "0-9", "other"/"#", or omit for all.`,
             valid: [...VALID_LETTERS],
         });
     }
@@ -102,30 +119,34 @@ async function handleAzList(req, res) {
         const $     = cheerio.load(pageRes.data);
         const $next = cheerio.load(nextRes.data);
 
-        // Total pages — AniWatch renders pagination with class .page-link
-        // Try to read the last page number from the pagination bar
-        let totalPages = page; // fallback: current page at minimum
+        // Total pages from the pagination bar
+        let totalPages = page;
         $('.pagination .page-item a.page-link').each((_, el) => {
-            const n = parseInt($( el).text().trim());
+            const n = parseInt($(el).text().trim());
             if (!isNaN(n) && n > totalPages) totalPages = n;
         });
 
         const hasNextPage = $next('.flw-item').length > 0;
         if (hasNextPage && page + 1 > totalPages) totalPages = page + 1;
 
-        // Available letters from the sidebar (so clients know which letters have content)
+        // Available letters from sidebar links
         const availableLetters = [];
-        $('.az-list-letter a').each((_, el) => {
-            const l = $(el).text().trim();
-            if (l) availableLetters.push(l.toUpperCase());
+        $('a[href*="/az-list"]').each((_, el) => {
+            const label = $(el).text().trim();
+            if (label && !availableLetters.includes(label)) availableLetters.push(label);
         });
 
-        const items = parseItems($);
-
-        const result = { letter: letter || 'ALL', page, totalPages, hasNextPage, items };
+        const items  = parseItems($);
+        const result = {
+            letter:     letter ? letter.toUpperCase() : 'ALL',
+            page,
+            totalPages,
+            hasNextPage,
+            items,
+        };
         if (availableLetters.length) result.availableLetters = availableLetters;
 
-        cacheSet(cacheKey, result, 10 * 60 * 1000); // cache 10 min
+        cacheSet(cacheKey, result, 10 * 60 * 1000);
         res.json(result);
 
     } catch (error) {
@@ -135,20 +156,17 @@ async function handleAzList(req, res) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// GET /api/az-list/all/:letter
-//   Fetches ALL pages for a given letter (or all letters if omitted) and
-//   returns a combined list. Use with caution on large letters like "S".
-//
-// Returns:
-//   { letter, totalPages, totalItems, items: [...] }
+// GET /api/az-list/all/:letter?
+//   Returns ALL pages for a letter combined into one response.
+//   Response: { letter, totalPages, totalItems, items }
 // ─────────────────────────────────────────────────────────────────────────────
 azlist.get('/az-list/all/:letter?', async (req, res) => {
-    const rawLetter = (req.params.letter || req.query.letter || '').toUpperCase().trim();
-    const letter    = rawLetter === '' ? null : rawLetter;
+    const rawLetter = req.params.letter || req.query.letter || '';
+    const letter    = normaliseLetter(rawLetter);
 
-    if (letter !== null && !VALID_LETTERS.has(letter)) {
+    if (letter === undefined) {
         return res.status(400).json({
-            error: `Invalid letter "${letter}". Use A-Z or "0".`,
+            error: `Invalid letter "${rawLetter}". Use A-Z, "0-9", "other"/"#", or omit for all.`,
             valid: [...VALID_LETTERS],
         });
     }
@@ -158,47 +176,42 @@ azlist.get('/az-list/all/:letter?', async (req, res) => {
     if (cached) return res.json({ ...cached, cached: true });
 
     try {
-        // ── Step 1: fetch page 1 to learn totalPages ──────────────────────
-        const firstUrl = buildUrl(letter, 1);
-        const { data: firstHtml } = await axios.get(firstUrl, {
+        const { data: firstHtml } = await axios.get(buildUrl(letter, 1), {
             timeout: 12000,
             headers: { 'User-Agent': USER_AGENT },
         });
 
         const $first = cheerio.load(firstHtml);
-
         let totalPages = 1;
         $first('.pagination .page-item a.page-link').each((_, el) => {
             const n = parseInt($first(el).text().trim());
             if (!isNaN(n) && n > totalPages) totalPages = n;
         });
 
-        // If only 1 page just return it
         let allItems = parseItems($first);
 
         if (totalPages > 1) {
-            // ── Step 2: fetch remaining pages in parallel ──────────────────
-            const pageNums = Array.from({ length: totalPages - 1 }, (_, i) => i + 2);
-            const pageRequests = pageNums.map(p =>
-                axios.get(buildUrl(letter, p), {
-                    timeout: 12000,
-                    headers: { 'User-Agent': USER_AGENT },
-                }).then(r => parseItems(cheerio.load(r.data)))
-                  .catch(() => []) // don't let one page failure kill the whole request
+            const rest = await Promise.all(
+                Array.from({ length: totalPages - 1 }, (_, i) => i + 2).map(p =>
+                    axios.get(buildUrl(letter, p), {
+                        timeout: 12000,
+                        headers: { 'User-Agent': USER_AGENT },
+                    })
+                    .then(r => parseItems(cheerio.load(r.data)))
+                    .catch(() => [])
+                )
             );
-
-            const restPages = await Promise.all(pageRequests);
-            for (const pageItems of restPages) allItems = allItems.concat(pageItems);
+            for (const pageItems of rest) allItems = allItems.concat(pageItems);
         }
 
         const result = {
-            letter:     letter || 'ALL',
+            letter:     letter ? letter.toUpperCase() : 'ALL',
             totalPages,
             totalItems: allItems.length,
             items:      allItems,
         };
 
-        cacheSet(cacheKey, result, 30 * 60 * 1000); // cache 30 min — full lists change rarely
+        cacheSet(cacheKey, result, 30 * 60 * 1000);
         res.json(result);
 
     } catch (error) {
@@ -207,7 +220,7 @@ azlist.get('/az-list/all/:letter?', async (req, res) => {
     }
 });
 
-// Single-page route (with optional letter / page path params)
+// Single-page routes
 azlist.get('/az-list/:letter/:page', handleAzList);
 azlist.get('/az-list/:letter',       handleAzList);
 azlist.get('/az-list',               handleAzList);
