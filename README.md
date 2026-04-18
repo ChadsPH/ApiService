@@ -107,10 +107,10 @@ const data = await resp.json();
 /api/genre/:genre_name/:page
 ```
 
-| Parameter    | Type   | Description                          | Required         |
-|--------------|--------|--------------------------------------|------------------|
+| Parameter    | Type   | Description                           | Required         |
+|--------------|--------|---------------------------------------|------------------|
 | `genre_name` | string | Genre name (e.g. `romance`, `action`) | Yes              |
-| `page`       | int    | Page number                          | Yes (default: 1) |
+| `page`       | int    | Page number                           | Yes (default: 1) |
 
 **Request:**
 ```javascript
@@ -142,31 +142,134 @@ const data = await resp.json();
 
 ---
 
-### `GET` Anime Schedule
+### `GET` Anime by Type / Category
 
 ```
-/api/shedule/:date
+/api/mix/:type/:page
 ```
 
-| Parameter | Type   | Description               | Required |
-|-----------|--------|---------------------------|----------|
-| `date`    | string | Date in `yyyy-mm-dd` format | Yes     |
+| Parameter | Type   | Description | Required |
+|-----------|--------|-------------|----------|
+| `type`    | string | One of: `movie`, `ova`, `ona`, `subbed-anime`, `dubbed-anime`, `special`, `tv`, `popular` | Yes |
+| `page`    | int    | Page number | Yes (default: 1) |
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/shedule/2024-01-28");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/mix/tv/1");
 const data = await resp.json();
 ```
 
 **Response:**
 ```json
 {
-  "Sheduletoday": [
+  "nextpageavai": true,
+  "mixAni": [
     {
-      "name": "The Apothecary Diaries",
-      "jname": "Kusuriya no Hitorigoto",
-      "time": "00:15",
-      "epshedule": "Episode 16"
+      "name": "Isekai Onsen Paradise",
+      "jname": "...",
+      "format": "TV",
+      "duration": "3m",
+      "idanime": "isekai-onsen-paradise-18982",
+      "sub": "2",
+      "dubani": false,
+      "totalep": false,
+      "img": "https://img.flawlessfiles.com/...",
+      "pg": "18+"
+    }
+  ]
+}
+```
+
+---
+
+### `GET` A-Z Anime List ⭐ New
+
+Browse the full AniWatch library sorted alphabetically.
+
+```
+/api/az-list
+/api/az-list/:letter
+/api/az-list/:letter/:page
+```
+
+| Parameter | Type   | Description                                                       | Required         |
+|-----------|--------|-------------------------------------------------------------------|------------------|
+| `letter`  | string | A–Z letter, or `0` for titles starting with a number/symbol      | No (returns all) |
+| `page`    | int    | Page number                                                       | No (default: 1)  |
+
+> You can also pass `letter` and `page` as query params: `/api/az-list?letter=A&page=2`
+
+**Request:**
+```javascript
+// All anime starting with "N", page 1
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/az-list/N/1");
+const data = await resp.json();
+```
+
+**Response:**
+```json
+{
+  "letter": "N",
+  "page": 1,
+  "totalPages": 4,
+  "hasNextPage": true,
+  "items": [
+    {
+      "name": "Naruto",
+      "jname": "Naruto",
+      "id": "naruto-355",
+      "image": "https://img.flawlessfiles.com/...",
+      "format": "TV",
+      "duration": "23m",
+      "sub": "220",
+      "dub": "220",
+      "totalEp": "220"
+    }
+  ],
+  "availableLetters": ["A","B","C","...","Z","0"]
+}
+```
+
+---
+
+### `GET` Full A-Z List (All Pages) ⭐ New
+
+Fetch **every page** for a given letter in one request. All pages are fetched in parallel and returned combined.
+
+```
+/api/az-list/all/:letter
+```
+
+| Parameter | Type   | Description                                                  | Required         |
+|-----------|--------|--------------------------------------------------------------|------------------|
+| `letter`  | string | A–Z letter, or `0` for numbers/symbols, or omit for all     | No               |
+
+> ⚠️ Popular letters like `S` or `T` can have hundreds of titles. Use with care.
+
+**Request:**
+```javascript
+// All anime starting with "B" across all pages
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/az-list/all/B");
+const data = await resp.json();
+```
+
+**Response:**
+```json
+{
+  "letter": "B",
+  "totalPages": 3,
+  "totalItems": 87,
+  "items": [
+    {
+      "name": "Bleach",
+      "jname": "Bleach",
+      "id": "bleach-367",
+      "image": "https://img.flawlessfiles.com/...",
+      "format": "TV",
+      "duration": "24m",
+      "sub": "366",
+      "dub": "366",
+      "totalEp": "366"
     }
   ]
 }
@@ -225,42 +328,50 @@ const data = await resp.json();
 
 ---
 
-### `GET` Anime by Type / Category
+### `GET` Anime Schedule
 
 ```
-/api/mix/:type/:page
+/api/shedule/:date
 ```
 
-| Parameter | Type   | Description | Required |
-|-----------|--------|-------------|----------|
-| `type`    | string | One of: `movie`, `ova`, `ona`, `subbed-anime`, `dubbed-anime`, `special`, `tv`, `popular` | Yes |
-| `page`    | int    | Page number | Yes (default: 1) |
+| Parameter | Type   | Description                 | Required |
+|-----------|--------|-----------------------------|----------|
+| `date`    | string | Date in `yyyy-mm-dd` format | Yes      |
 
 **Request:**
 ```javascript
-const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/mix/tv/1");
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/shedule/2024-01-28");
 const data = await resp.json();
 ```
 
 **Response:**
 ```json
 {
-  "nextpageavai": true,
-  "mixAni": [
+  "Sheduletoday": [
     {
-      "name": "Isekai Onsen Paradise",
-      "jname": "...",
-      "format": "TV",
-      "duration": "3m",
-      "idanime": "isekai-onsen-paradise-18982",
-      "sub": "2",
-      "dubani": false,
-      "totalep": false,
-      "img": "https://img.flawlessfiles.com/...",
-      "pg": "18+"
+      "name": "The Apothecary Diaries",
+      "jname": "Kusuriya no Hitorigoto",
+      "time": "00:15",
+      "epshedule": "Episode 16"
     }
   ]
 }
+```
+
+---
+
+### `GET` Random Anime
+
+```
+/api/random
+```
+
+Returns a fully detailed random anime (same structure as `/api/related`). Not cached — always returns a different title.
+
+**Request:**
+```javascript
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/random");
+const data = await resp.json();
 ```
 
 ---
@@ -304,9 +415,9 @@ const data = await resp.json();
 /api/server/:epId
 ```
 
-| Parameter | Type   | Description                              | Required |
-|-----------|--------|------------------------------------------|----------|
-| `epId`    | string | Episode ID (e.g. `ep=3662` or just `3662`) | Yes    |
+| Parameter | Type   | Description                                | Required |
+|-----------|--------|--------------------------------------------|----------|
+| `epId`    | string | Episode ID (e.g. `ep=3662` or just `3662`) | Yes      |
 
 **Request:**
 ```javascript
@@ -378,7 +489,7 @@ const data = await resp.json();
 
 ---
 
-### `GET` MegaPlay Embed URL ⭐ New
+### `GET` MegaPlay Embed URL
 
 ```
 /api/mega-embed/:episodeId/:lang
@@ -387,10 +498,10 @@ const data = await resp.json();
 The simplest way to get a working video player for any episode.  
 Uses **megaplay.buzz** — mirrors the full AniWatch library and works even if the original source changes.
 
-| Parameter   | Type   | Description                                   | Required |
-|-------------|--------|-----------------------------------------------|----------|
+| Parameter   | Type   | Description                                    | Required |
+|-------------|--------|------------------------------------------------|----------|
 | `episodeId` | int    | The `ep=` number from the AniWatch episode URL | Yes      |
-| `lang`      | string | `sub` or `dub`                                | Yes      |
+| `lang`      | string | `sub` or `dub`                                 | Yes      |
 
 **How to find the episodeId:**  
 From `/api/episode/:animeId`, each episode has an `epId` like `"hunter-x-hunter-128?ep=3661"`.  
@@ -414,12 +525,156 @@ You can paste the `iframe` value directly into your HTML, or use `embedUrl` in a
 
 ---
 
+### `GET` Characters & Voice Actors (Single Page) ⭐ Updated
+
+```
+/api/character/list/:id?page=1
+```
+
+| Parameter | Type   | Description                              | Required         |
+|-----------|--------|------------------------------------------|------------------|
+| `id`      | string | Anime slug (e.g. `one-piece-100`) or numeric ID | Yes       |
+| `page`    | int    | Page number (query param)                | No (default: 1)  |
+
+**Request:**
+```javascript
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/character/list/one-piece-100?page=1");
+const data = await resp.json();
+```
+
+**Response:**
+```json
+{
+  "results": [
+    {
+      "character": {
+        "name": "Monkey D. Luffy",
+        "poster": "https://img.flawlessfiles.com/...",
+        "role": "Main"
+      },
+      "voiceActors": [
+        {
+          "name": "Mayumi Tanaka",
+          "poster": "https://img.flawlessfiles.com/...",
+          "language": "Japanese"
+        },
+        {
+          "name": "Colleen Clinkenbeard",
+          "poster": "https://img.flawlessfiles.com/...",
+          "language": "English"
+        }
+      ]
+    }
+  ],
+  "totalPages": 5,
+  "page": 1
+}
+```
+
+---
+
+### `GET` All Characters & Voice Actors ⭐ New
+
+Fetches **every page** of characters for an anime and returns them all in a single combined response. All pages are fetched in parallel.
+
+```
+/api/character/all/:id
+```
+
+| Parameter | Type   | Description                              | Required |
+|-----------|--------|------------------------------------------|----------|
+| `id`      | string | Anime slug (e.g. `one-piece-100`) or numeric ID | Yes |
+
+**Request:**
+```javascript
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/character/all/one-piece-100");
+const data = await resp.json();
+```
+
+**Response:**
+```json
+{
+  "animeId": "100",
+  "totalPages": 5,
+  "total": 214,
+  "results": [
+    {
+      "character": {
+        "name": "Monkey D. Luffy",
+        "poster": "https://img.flawlessfiles.com/...",
+        "role": "Main"
+      },
+      "voiceActors": [
+        {
+          "name": "Mayumi Tanaka",
+          "poster": "https://img.flawlessfiles.com/...",
+          "language": "Japanese"
+        },
+        {
+          "name": "Colleen Clinkenbeard",
+          "poster": "https://img.flawlessfiles.com/...",
+          "language": "English"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
+### `GET` Search Characters ⭐ New
+
+Search through all characters and voice actors for a given anime by name. Matches both character names and VA names (case-insensitive).
+
+```
+/api/character/search?id=:animeId&name=:query
+```
+
+| Parameter | Type   | Description                              | Required |
+|-----------|--------|------------------------------------------|----------|
+| `id`      | string | Anime slug or numeric ID                 | Yes      |
+| `name`    | string | Character or voice actor name to search  | Yes      |
+
+**Request:**
+```javascript
+const resp = await fetch("https://apiservice-production-585e.up.railway.app/api/character/search?id=one-piece-100&name=Nami");
+const data = await resp.json();
+```
+
+**Response:**
+```json
+{
+  "animeId": "100",
+  "query": "Nami",
+  "total": 1,
+  "results": [
+    {
+      "character": {
+        "name": "Nami",
+        "poster": "https://img.flawlessfiles.com/...",
+        "role": "Main"
+      },
+      "voiceActors": [
+        {
+          "name": "Akemi Okamura",
+          "poster": "https://img.flawlessfiles.com/...",
+          "language": "Japanese"
+        }
+      ]
+    }
+  ]
+}
+```
+
+---
+
 ## Typical Playback Flows
 
 ### Flow A — MegaPlay (recommended, simplest)
 
 ```
-1. GET /api/episode/:animeId         → get episode list, extract episodeId from ep=XXXXX
+1. GET /api/episode/:animeId           → get episode list, extract episodeId from ep=XXXXX
 2. GET /api/mega-embed/:episodeId/sub  → get ready-to-use megaplay.buzz embed URL
 3. Render the iframe on your page
 ```
@@ -427,9 +682,9 @@ You can paste the `iframe` value directly into your HTML, or use `embedUrl` in a
 ### Flow B — Direct HLS (advanced)
 
 ```
-1. GET /api/episode/:animeId         → get episode list + epId
-2. GET /api/server/:epId             → get server list + srcId (use megacloud srcId)
-3. GET /api/src-server/:srcId        → get HLS stream URL
+1. GET /api/episode/:animeId     → get episode list + epId
+2. GET /api/server/:epId         → get server list + srcId (use megacloud srcId)
+3. GET /api/src-server/:srcId    → get HLS stream URL
 4. Feed the .m3u8 URL into your video player (hls.js, Video.js, etc.)
 ```
 
@@ -439,16 +694,23 @@ You can paste the `iframe` value directly into your HTML, or use `embedUrl` in a
 
 All endpoints cache responses in memory to reduce upstream load:
 
-| Endpoint         | Cache TTL  |
-|------------------|------------|
-| `/api/parse`     | 5 minutes  |
-| `/api/search`    | —          |
-| `/api/genre`     | 5 minutes  |
-| `/api/episode`   | 10 minutes |
-| `/api/server`    | 3 minutes  |
-| `/api/src-server`| 5 minutes  |
-| `/api/related`   | 10 minutes |
-| `/api/mix`       | 5 minutes  |
+| Endpoint                  | Cache TTL  |
+|---------------------------|------------|
+| `/api/parse`              | 5 minutes  |
+| `/api/search`             | 3 minutes  |
+| `/api/genre`              | 5 minutes  |
+| `/api/mix`                | 5 minutes  |
+| `/api/az-list`            | 10 minutes |
+| `/api/az-list/all`        | 30 minutes |
+| `/api/related`            | 10 minutes |
+| `/api/episode`            | 10 minutes |
+| `/api/shedule`            | 1 hour     |
+| `/api/server`             | 3 minutes  |
+| `/api/src-server`         | 5 minutes  |
+| `/api/character/list`     | 15 minutes |
+| `/api/character/all`      | 15 minutes |
+| `/api/character/search`   | 15 minutes (reuses `/all` cache) |
+| `/api/random`             | No cache   |
 
 Cached responses include a `"cached": true` field.
 
