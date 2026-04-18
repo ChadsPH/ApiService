@@ -37,33 +37,48 @@ function extractNumericId(slug) {
 /**
  * Parse a single .bac-item element into a fully-structured character object.
  *
- * Each item has:
- *   character  — name, poster, role
- *   voiceActors[] — name, poster, language
- *                   (AniWatch can stack multiple RTL blocks for multi-language VAs)
+ * AniWatch uses two layouts depending on the character entry:
+ *   Layout A: .per-info.ltr  (character)  +  .per-info.rtl  (VA)
+ *   Layout B: .per-info.ltr  (character)  +  .per-info       (VA, no rtl class)
+ *
+ * We try every known pattern so nothing gets missed.
  */
 function parseBacItem($, el) {
     const $el = $(el);
 
     // ── character (left / ltr side) ──────────────────────────────────────────
-    const charImg  = $el.find('.per-info.ltr img').attr('data-src')
-                  || $el.find('.per-info.ltr img').attr('src')
+    const $ltr    = $el.find('.per-info.ltr').first();
+    const charImg  = $ltr.find('img').attr('data-src')
+                  || $ltr.find('img').attr('src')
                   || null;
-    const charName = $el.find('.per-info.ltr .pi-name').text().trim() || null;
-    const charRole = $el.find('.per-info.ltr .pi-cast').first().text().trim() || null;
+    const charName = $ltr.find('.pi-name').text().trim()
+                  || $ltr.find('h4, a').first().text().trim()
+                  || null;
+    const charRole = $ltr.find('.pi-cast').first().text().trim()
+                  || $ltr.find('span').first().text().trim()
+                  || null;
 
-    // ── voice actor(s) (right / rtl side) ────────────────────────────────────
-    // AniWatch stacks multiple .per-info.rtl blocks for multi-language VAs
+    if (!charName) return null;
+
+    // ── voice actor(s) (right side) ───────────────────────────────────────────
+    // AniWatch sometimes uses .per-info.rtl, sometimes just .per-info (no rtl),
+    // and sometimes stacks multiple blocks for Japanese + English VAs.
+    // Strategy: collect every .per-info block that is NOT the ltr/character side.
     const voiceActors = [];
+    const seen        = new Set();
+
+    // Pass 1: explicit .rtl blocks (most reliable)
     $el.find('.per-info.rtl').each((_, va) => {
-        const $va  = $(va);
+        const $va = $(va);
         const name = $va.find('.pi-name').text().trim()
                   || $va.find('h4').text().trim()
+                  || $va.find('a').first().text().trim()
                   || null;
-        if (!name) return; // skip empty/ghost blocks
+        if (!name || seen.has(name)) return;
+        seen.add(name);
 
         const language = $va.find('.pi-cast').text().trim()
-                      || $va.find('span').text().trim()
+                      || $va.find('span').first().text().trim()
                       || null;
 
         voiceActors.push({
@@ -73,8 +88,50 @@ function parseBacItem($, el) {
         });
     });
 
-    // Only return if at least a character name exists
-    if (!charName) return null;
+    // Pass 2: any remaining .per-info blocks that are NOT the ltr block
+    // (catches the layout where rtl class is missing)
+    if (voiceActors.length === 0) {
+        $el.find('.per-info').each((_, block) => {
+            const $block = $(block);
+            if ($block.hasClass('ltr')) return; // skip character side
+
+            const name = $block.find('.pi-name').text().trim()
+                      || $block.find('h4').text().trim()
+                      || $block.find('a').first().text().trim()
+                      || null;
+            if (!name || seen.has(name)) return;
+            seen.add(name);
+
+            const language = $block.find('.pi-cast').text().trim()
+                          || $block.find('span').first().text().trim()
+                          || null;
+
+            voiceActors.push({
+                name,
+                poster:   $block.find('img').attr('data-src') || $block.find('img').attr('src') || null,
+                language: language || null,
+            });
+        });
+    }
+
+    // Pass 3: last-resort — any .pi-name that is NOT the character's own name
+    if (voiceActors.length === 0) {
+        $el.find('.pi-name').each((i, nameEl) => {
+            if (i === 0) return; // first .pi-name is always the character
+            const name = $(nameEl).text().trim();
+            if (!name || seen.has(name)) return;
+            seen.add(name);
+
+            const $parent  = $(nameEl).closest('.per-info, .bac-item-right, div');
+            const language = $parent.find('.pi-cast, span').first().text().trim() || null;
+
+            voiceActors.push({
+                name,
+                poster:   $parent.find('img').attr('data-src') || $parent.find('img').attr('src') || null,
+                language: language || null,
+            });
+        });
+    }
 
     return {
         character: {
@@ -205,7 +262,7 @@ character.get('/character/all/:id', async (req, res) => {
                         .then(r => r.items)
                         .catch(err => {
                             console.warn(`[character/all] page ${p} failed: ${err.message}`);
-                            return []; // partial failure — don't crash the whole response
+                            return [];
                         })
                 )
             );
@@ -219,7 +276,7 @@ character.get('/character/all/:id', async (req, res) => {
             results:    allItems,
         };
 
-        cacheSet(cacheKey, result, 15 * 60 * 1000); // cache 15 min
+        cacheSet(cacheKey, result, 15 * 60 * 1000);
         res.json(result);
 
     } catch (error) {
@@ -251,7 +308,6 @@ character.get('/character/search', async (req, res) => {
     if (!numericId) return res.status(400).json({ error: 'Invalid anime ID.' });
 
     try {
-        // Re-use the /all cache if already warm
         const allKey    = `character_all_${numericId}`;
         let   allResult = cacheGet(allKey);
 
