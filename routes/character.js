@@ -18,80 +18,134 @@ function cacheSet(key, value, ttlMs) {
     cache.set(key, { value, expiry: Date.now() + ttlMs });
 }
 
-/**
- * Extract the numeric AniWatch anime ID from a slug.
- * e.g. "one-piece-100"  → "100"
- *      "naruto-355"     → "355"
- *      "100"            → "100"  (already numeric)
- */
 function extractNumericId(slug) {
     if (!slug) return null;
-    // If it's already purely numeric, use as-is
     if (/^\d+$/.test(slug)) return slug;
-    // Otherwise take the last hyphen-separated segment
     const parts = slug.split('-');
     const last  = parts[parts.length - 1];
     return /^\d+$/.test(last) ? last : null;
 }
 
+async function fetchAniwatch(numericId, page) {
+    const { data } = await axios.get(
+        `https://aniwatchtv.to/ajax/character/list/${numericId}?page=${page}`,
+        {
+            timeout: 12000,
+            headers: {
+                'User-Agent': USER_AGENT,
+                'X-Requested-With': 'XMLHttpRequest',
+                'Referer': 'https://aniwatchtv.to/',
+            },
+        }
+    );
+    return data;
+}
+
 /**
- * Parse a single .bac-item element into a structured character object.
- * Each item can have multiple voice actors (different languages on the right side).
+ * Parse a single .bac-item element.
+ * Tries multiple selector strategies to handle AniWatch HTML variations.
  */
 function parseBacItem($, el) {
     const $el = $(el);
 
-    // ── character (left / ltr side) ──────────────────────────────────────────
-    const charImg  = $el.find('.per-info.ltr img').attr('data-src')
-                  || $el.find('.per-info.ltr img').attr('src')
-                  || null;
-    const charName = $el.find('.per-info.ltr .pi-name').text().trim() || null;
-    const charRole = $el.find('.per-info.ltr .pi-cast').first().text().trim() || null;
+    // ── CHARACTER (ltr side) ─────────────────────────────────────────────────
+    const $ltr    = $el.find('.per-info.ltr');
+    const charImg = $ltr.find('img').attr('data-src') || $ltr.find('img').attr('src') || null;
 
-    // ── voice actor(s) (right / rtl side) ───────────────────────────────────
-    // AniWatch can stack multiple .per-info.rtl blocks for multi-language VAs
+    // name: try .pi-name first, then any h4, then any anchor text
+    const charName = $ltr.find('.pi-name').text().trim()
+                  || $ltr.find('h4').text().trim()
+                  || $ltr.find('a[href*="/character"]').text().trim()
+                  || null;
+
+    // role: try .pi-cast, then span
+    const charRole = $ltr.find('.pi-cast').first().text().trim()
+                  || $ltr.find('span').first().text().trim()
+                  || null;
+
+    // ── VOICE ACTORS (rtl side) ──────────────────────────────────────────────
     const voiceActors = [];
-    $el.find('.per-info.rtl').each((_, va) => {
-        const $va = $(va);
+
+    // Strategy 1: iterate each .per-info.rtl block (one block per language)
+    $el.find('.per-info.rtl').each((_, vaEl) => {
+        const $va = $(vaEl);
+
         const name = $va.find('.pi-name').text().trim()
                   || $va.find('h4').text().trim()
+                  || $va.find('a[href*="/people"]').text().trim()
+                  || $va.find('a').first().text().trim()
                   || null;
-        if (!name) return; // skip empty blocks
-        voiceActors.push({
-            name,
-            poster:   $va.find('img').attr('data-src') || $va.find('img').attr('src') || null,
-            language: $va.find('.pi-cast').text().trim()
-                   || $va.find('span').text().trim()
-                   || null,
-        });
+
+        if (!name) return;
+
+        const language = $va.find('.pi-cast').text().trim()
+                      || $va.find('span').first().text().trim()
+                      || null;
+
+        const poster = $va.find('img').attr('data-src')
+                    || $va.find('img').attr('src')
+                    || null;
+
+        voiceActors.push({ name, poster, language });
     });
 
+    // Strategy 2: if no VAs found yet, try direct h4 siblings inside the item
+    // (some AniWatch versions put all VAs inline without .per-info.rtl wrappers)
+    if (voiceActors.length === 0) {
+        // Look for any h4 NOT inside .per-info.ltr (those belong to the character)
+        $el.find('h4').each((_, h4El) => {
+            if ($ltr.find(h4El).length > 0) return; // skip character's own h4
+            const $h4   = $(h4El);
+            const name  = $h4.text().trim();
+            if (!name) return;
+            const $wrap = $h4.closest('[class]');
+            const lang  = $wrap.find('span').first().text().trim() || null;
+            const img   = $wrap.find('img').attr('data-src') || $wrap.find('img').attr('src') || null;
+            voiceActors.push({ name, poster: img, language: lang });
+        });
+    }
+
     return {
-        character: {
-            name:   charName,
-            poster: charImg,
-            role:   charRole,
-        },
+        character: { name: charName, poster: charImg, role: charRole },
         voiceActors,
     };
 }
 
-/**
- * GET /api/character/list/:id?page=1
- *
- * :id  — the AniWatch anime slug (e.g. "one-piece-100") or numeric ID ("100")
- * page — page number (default 1)
- *
- * Returns: { results: [...], totalPages: N, page: N }
- */
+// ── DEBUG: returns raw HTML of the first bac-item so you can inspect selectors
+character.get('/character/debug/:id', async (req, res) => {
+    const numericId = extractNumericId(req.params.id);
+    if (!numericId) return res.status(400).json({ error: 'Invalid ID' });
+
+    try {
+        const data = await fetchAniwatch(numericId, 1);
+        if (!data?.html) return res.json({ raw: null, note: 'No html field in response', data });
+
+        const $     = cheerio.load(data.html);
+        const items = [];
+
+        $('.bac-item').each((i, el) => {
+            if (i >= 2) return false; // only first 2 items for debugging
+            items.push({
+                index:      i,
+                outerHTML:  $(el).prop('outerHTML'),
+                parsed:     parseBacItem($, el),
+            });
+        });
+
+        res.json({ totalPages: data.totalPages, itemCount: $('.bac-item').length, items });
+    } catch (err) {
+        res.status(500).json({ error: err.message });
+    }
+});
+
+// ── MAIN: GET /api/character/list/:id?page=1
 character.get('/character/list/:id', async (req, res) => {
     const slug = req.params.id;
     const page = Math.max(1, parseInt(req.query.page) || 1);
 
-    // Extract the internal numeric anime ID AniWatch uses for its AJAX call
     const numericId = extractNumericId(slug);
     if (!numericId) {
-        return res.status(400).json({ error: 'Invalid anime ID — could not extract numeric ID from slug.' });
+        return res.status(400).json({ error: 'Invalid anime ID.' });
     }
 
     const cacheKey = `character_${numericId}_p${page}`;
@@ -99,22 +153,10 @@ character.get('/character/list/:id', async (req, res) => {
     if (cached) return res.json({ ...cached, cached: true });
 
     try {
-        // ── hit AniWatch's AJAX character-list endpoint ──────────────────────
-        const { data } = await axios.get(
-            `https://aniwatchtv.to/ajax/character/list/${numericId}?page=${page}`,
-            {
-                timeout: 12000,
-                headers: {
-                    'User-Agent': USER_AGENT,
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'Referer': `https://aniwatchtv.to/`,
-                },
-            }
-        );
+        const data = await fetchAniwatch(numericId, page);
 
-        // The endpoint returns { status: true, html: "...", totalPages: N }
         if (!data || !data.html) {
-            return res.status(502).json({ error: 'Empty response from AniWatch character API.' });
+            return res.status(502).json({ error: 'Empty response from AniWatch.', raw: data });
         }
 
         const $          = cheerio.load(data.html);
@@ -123,12 +165,11 @@ character.get('/character/list/:id', async (req, res) => {
         const results = [];
         $('.bac-item').each((_, el) => {
             const item = parseBacItem($, el);
-            // Only include items that have at least a character name
             if (item.character.name) results.push(item);
         });
 
         const result = { results, totalPages, page };
-        cacheSet(cacheKey, result, 15 * 60 * 1000); // cache 15 min
+        cacheSet(cacheKey, result, 15 * 60 * 1000);
         res.json(result);
 
     } catch (error) {
